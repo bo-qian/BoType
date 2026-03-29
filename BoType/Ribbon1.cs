@@ -94,12 +94,40 @@ namespace BoType
                 Word.Application app = Globals.ThisAddIn.Application;
                 if (app.Documents.Count > 0)
                 {
-                    app.ActiveDocument.Fields.Update();
+                    Word.Document doc = app.ActiveDocument;
+
+                    // 更新主文档中的所有域（包含 STYLEREF、SEQ 和 交叉引用）
+                    doc.Fields.Update();
+
+                    // 遍历所有的文本故事（包括页眉、页脚、文本框等）以确保彻底更新
+                    foreach (Word.Range storyRange in doc.StoryRanges)
+                    {
+                        Word.Range currentRange = storyRange;
+                        while (currentRange != null)
+                        {
+                            currentRange.Fields.Update();
+                            currentRange = currentRange.NextStoryRange;
+                        }
+                    }
+
+                    System.Windows.Forms.MessageBox.Show("引用更新完成！", "BoType - 提示");
                 }
             }
             catch (Exception ex)
             {
                 System.Windows.Forms.MessageBox.Show("更新失败: " + ex.Message, "BoType - 错误");
+            }
+        }
+
+        private void buttonGithub_Click(object sender, RibbonControlEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start("https://github.com/bo-qian/BoType");
+            }
+            catch (Exception ex)
+            {
+                System.Windows.Forms.MessageBox.Show("无法打开链接: " + ex.Message, "BoType - 错误");
             }
         }
     }

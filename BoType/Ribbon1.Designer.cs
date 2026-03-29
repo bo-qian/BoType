@@ -46,16 +46,19 @@
             this.box1 = this.Factory.CreateRibbonBox();
             this.dropDown1 = this.Factory.CreateRibbonDropDown();
             this.editBoxWidth = this.Factory.CreateRibbonEditBox();
-            this.button5 = this.Factory.CreateRibbonButton();
             this.button6 = this.Factory.CreateRibbonButton();
+            this.button5 = this.Factory.CreateRibbonButton();
             this.group3 = this.Factory.CreateRibbonGroup();
             this.button3 = this.Factory.CreateRibbonButton();
             this.button4 = this.Factory.CreateRibbonButton();
+            this.groupAbout = this.Factory.CreateRibbonGroup();
+            this.buttonGithub = this.Factory.CreateRibbonButton();
             this.tab1.SuspendLayout();
             this.group1.SuspendLayout();
             this.group2.SuspendLayout();
             this.box1.SuspendLayout();
             this.group3.SuspendLayout();
+            this.groupAbout.SuspendLayout();
             this.SuspendLayout();
             // 
             // tab1
@@ -63,6 +66,7 @@
             this.tab1.Groups.Add(this.group1);
             this.tab1.Groups.Add(this.group2);
             this.tab1.Groups.Add(this.group3);
+            this.tab1.Groups.Add(this.groupAbout);
             this.tab1.Label = "BoType";
             this.tab1.Name = "tab1";
             // 
@@ -129,14 +133,6 @@
             this.editBoxWidth.ShowImage = true;
             this.editBoxWidth.Text = "38";
             // 
-            // button5
-            // 
-            this.button5.Label = "给公式编号";
-            this.button5.Name = "button5";
-            this.button5.OfficeImageId = "NumberingRestart";
-            this.button5.ShowImage = true;
-            this.button5.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.button5_Click);
-            // 
             // button6
             // 
             this.button6.Label = "设置为默认编号样式";
@@ -144,6 +140,14 @@
             this.button6.OfficeImageId = "SetAsDefault";
             this.button6.ShowImage = true;
             this.button6.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.button6_Click);
+            // 
+            // button5
+            // 
+            this.button5.Label = "给公式编号";
+            this.button5.Name = "button5";
+            this.button5.OfficeImageId = "NumberingRestart";
+            this.button5.ShowImage = true;
+            this.button5.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.button5_Click);
             // 
             // group3
             // 
@@ -170,6 +174,21 @@
             this.button4.ShowImage = true;
             this.button4.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.button4_Click);
             // 
+            // groupAbout
+            // 
+            this.groupAbout.Items.Add(this.buttonGithub);
+            this.groupAbout.Label = "关于";
+            this.groupAbout.Name = "groupAbout";
+            // 
+            // buttonGithub
+            // 
+            this.buttonGithub.ControlSize = Microsoft.Office.Core.RibbonControlSize.RibbonControlSizeLarge;
+            this.buttonGithub.Label = "开源地址";
+            this.buttonGithub.Name = "buttonGithub";
+            this.buttonGithub.OfficeImageId = "Help";
+            this.buttonGithub.ShowImage = true;
+            this.buttonGithub.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.buttonGithub_Click);
+            // 
             // Ribbon1
             // 
             this.Name = "Ribbon1";
@@ -186,6 +205,8 @@
             this.box1.PerformLayout();
             this.group3.ResumeLayout(false);
             this.group3.PerformLayout();
+            this.groupAbout.ResumeLayout(false);
+            this.groupAbout.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -205,6 +226,8 @@
         internal Microsoft.Office.Tools.Ribbon.RibbonGroup group3;
         internal Microsoft.Office.Tools.Ribbon.RibbonButton button3;
         internal Microsoft.Office.Tools.Ribbon.RibbonButton button4;
+        internal Microsoft.Office.Tools.Ribbon.RibbonGroup groupAbout;
+        internal Microsoft.Office.Tools.Ribbon.RibbonButton buttonGithub;
     }
 
     partial class ThisRibbonCollection

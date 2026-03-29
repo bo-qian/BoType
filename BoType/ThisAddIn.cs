@@ -27,21 +27,30 @@ namespace BoType
             Word.Application app = this.Application;
             if (app.Documents.Count == 0) return;
 
-            Word.Document doc = app.ActiveDocument;
-            Word.Selection selection = app.Selection;
+            try
+            {
+                app.ScreenUpdating = false;
 
-            Word.Range rng = selection.Range;
-            rng.Collapse(Word.WdCollapseDirection.wdCollapseStart);
+                Word.Document doc = app.ActiveDocument;
+                Word.Selection selection = app.Selection;
 
-            doc.OMaths.Add(rng);
-            Word.OMath mathObj = rng.OMaths[1];
+                Word.Range rng = selection.Range;
+                rng.Collapse(Word.WdCollapseDirection.wdCollapseStart);
 
-            // 设为行内公式
-            mathObj.Type = Word.WdOMathType.wdOMathInline;
+                doc.OMaths.Add(rng);
+                Word.OMath mathObj = rng.OMaths[1];
 
-            Word.Range inputRng = mathObj.Range;
-            inputRng.Collapse(Word.WdCollapseDirection.wdCollapseStart);
-            inputRng.Select();
+                // 设为行内公式
+                mathObj.Type = Word.WdOMathType.wdOMathInline;
+
+                Word.Range inputRng = mathObj.Range;
+                inputRng.Collapse(Word.WdCollapseDirection.wdCollapseStart);
+                inputRng.Select();
+            }
+            finally
+            {
+                try { app.ScreenUpdating = true; } catch {}
+            }
         }
 
         private bool TryGetChapterInfo(Word.Document doc, Word.Selection selection, out bool hasAutoNum, out int chapterCount)
@@ -103,6 +112,9 @@ namespace BoType
                     {
                         if (countRng.Start > findRng.Start) break;
                         count++;
+
+                        // 防止由于找到无内容标题导致死循环
+                        countRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
                     }
                     chapterCount = count > 0 ? count : 1;
                 }
@@ -133,177 +145,189 @@ namespace BoType
                 }
             }
 
-            if (numberStyle == 0)
+            try
             {
-                // 选择“无”时直接插入原生单行公式，不生成表格
-                Word.Range rng = selection.Range;
-                rng.Collapse(Word.WdCollapseDirection.wdCollapseStart);
-                doc.OMaths.Add(rng);
+                app.ScreenUpdating = false;
 
-                Word.OMath mathObjNative = rng.OMaths[1];
-                mathObjNative.Type = Word.WdOMathType.wdOMathDisplay;
-
-                Word.Range inputRngNative = mathObjNative.Range;
-                inputRngNative.Collapse(Word.WdCollapseDirection.wdCollapseStart);
-                inputRngNative.Select();
-                return;
-            }
-
-            // 1. 动态获取当前光标所在节的页面设置
-            Word.PageSetup pageSetup = selection.PageSetup;
-            float pageWidth = pageSetup.PageWidth;
-            float leftMargin = pageSetup.LeftMargin;
-            float rightMargin = pageSetup.RightMargin;
-
-            // 2. 计算可用的排版宽度
-            float usableWidth = pageWidth - leftMargin - rightMargin;
-            // 定义左右两侧专用于编号和占位的列宽
-            float centerWidth = usableWidth - (sideWidth * 2);
-
-            // 3. 在当前位置插入一个 1行3列 的无边框表格
-            Word.Table table = doc.Tables.Add(selection.Range, 1, 3);
-            // 去除表格边框
-            table.Borders.Enable = 0;
-            // 设置整行内容垂直居中
-            table.Rows[1].Cells.VerticalAlignment = Word.WdCellVerticalAlignment.wdCellAlignVerticalCenter;
-
-            // 禁用自动调整并重置表格整体缩进，防止其他文档样式干扰
-            table.AllowAutoFit = false;
-            table.Rows.LeftIndent = 0f;
-
-            // 严格设定三等分/对称的两侧宽度，才能保证中间列绝对在页面中心
-            table.Cell(1, 1).Width = sideWidth;
-            table.Cell(1, 2).Width = centerWidth;
-            table.Cell(1, 3).Width = sideWidth;
-
-            // ==== 处理第一列：左侧占位 ====
-            Word.Cell cellLeft = table.Cell(1, 1);
-            // 取消左侧边距，让未来可能的填充物完全贴合页面最左侧
-            cellLeft.LeftPadding = 0f;
-
-            // ==== 处理第二列：中间区域插入 Display 模式公式 ====
-            Word.Cell cellCenter = table.Cell(1, 2);
-            // 中间列文本水平居中
-            cellCenter.Range.ParagraphFormat.Alignment = Word.WdParagraphAlignment.wdAlignParagraphCenter;
-
-            // 获取中间单元格的开始位置并选中（模拟用户在此处插入）
-            Word.Range rngCenter = cellCenter.Range;
-            rngCenter.Collapse(Word.WdCollapseDirection.wdCollapseStart);
-            rngCenter.Select();
-
-            // 借助 Selection 直接无痕插入空白公式框。
-            // 针对完全 Empty 的 Range，直接 OMaths.Add(Range) 容易导致返回的 Range 是空或 OMaths 集合长度为 0 的异常
-            doc.OMaths.Add(app.Selection.Range);
-
-            // 重新在单元格的作用域内获取被创建的公式
-            Word.OMath mathObj = cellCenter.Range.OMaths[1];
-
-            // 强制设为显示模式 (wdOMathDisplay = 0)，防止在此框架下变成压缩版的行内公式
-            mathObj.Type = Word.WdOMathType.wdOMathDisplay;
-            // mathObj.BuildUp() 被省略，因为对于空的公式框进行 BuildUp 生成二维结构没有必要且容易出错
-
-            // ==== 处理第三列：右侧区域插入编号和括号 ====
-            Word.Cell cellRight = table.Cell(1, 3);
-            // 右边列文本右对齐
-            cellRight.Range.ParagraphFormat.Alignment = Word.WdParagraphAlignment.wdAlignParagraphRight;
-
-            if (numberStyle > 0)
-            {
-                Word.Range rngRight = cellRight.Range;
-                rngRight.Collapse(Word.WdCollapseDirection.wdCollapseStart);  // 定位到单元格开始
-
-                // 插入括号
-                rngRight.Text = "()";
-
-                // 将光标定位在左右括号之间，准备插入编号的域代码
-                Word.Range rngNum = table.Cell(1, 3).Range;
-                rngNum.Collapse(Word.WdCollapseDirection.wdCollapseStart);
-                rngNum.Move(Word.WdUnits.wdCharacter, 1);  // 向右移动1个字符，进入 '(' 的右侧
-
-                // 记录最开始的插入位置，供后续外围包裹书签使用
-                int bmStartPos = rngNum.Start;
-
-                Word.Range bmRng;
-
-                if (numberStyle == 1)
+                if (numberStyle == 0)
                 {
-                    // 插入纯数字自动编号 (SEQ 域)
-                    Word.Field field = doc.Fields.Add(rngNum, Word.WdFieldType.wdFieldEmpty, @"SEQ 公式 \* ARABIC", false);
-                    Word.Range lastRng = field.Result.Duplicate;
-                    lastRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-                    lastRng.Move(Word.WdUnits.wdCharacter, 1);
-                    bmRng = doc.Range(bmStartPos, lastRng.Start);
+                    // 选择“无”时直接插入原生单行公式，不生成表格
+                    Word.Range rng = selection.Range;
+                    rng.Collapse(Word.WdCollapseDirection.wdCollapseStart);
+                    doc.OMaths.Add(rng);
+
+                    Word.OMath mathObjNative = rng.OMaths[1];
+                    mathObjNative.Type = Word.WdOMathType.wdOMathDisplay;
+
+                    Word.Range inputRngNative = mathObjNative.Range;
+                    inputRngNative.Collapse(Word.WdCollapseDirection.wdCollapseStart);
+                    inputRngNative.Select();
+                    return;
                 }
-                else
-                {
-                    // 插入章节编号 (如 1.1)：组合 STYLEREF 和 SEQ 或者静态数字
 
-                    Word.Range sepRng;
-                    if (hasAutoNum)
+                // 1. 动态获取当前光标所在节的页面设置
+                Word.PageSetup pageSetup;
+                try { pageSetup = selection.Sections[1].PageSetup; } 
+                catch { pageSetup = selection.PageSetup; }
+
+                float pageWidth = pageSetup.PageWidth;
+                float leftMargin = pageSetup.LeftMargin;
+                float rightMargin = pageSetup.RightMargin;
+
+                // 如果返回了 wdUndefined (9999999) 导致溢出，则做一个简单的回退保护
+                if (pageWidth >= 999999 || leftMargin >= 999999 || rightMargin >= 999999)
+                {
+                    pageWidth = 595.0f; // 相当于 A4 宽度
+                    leftMargin = 90.0f;
+                    rightMargin = 90.0f;
+                }
+
+                // 2. 计算可用的排版宽度
+                float usableWidth = pageWidth - leftMargin - rightMargin;
+                // 定义左右两侧专用于编号和占位的列宽
+                float centerWidth = usableWidth - (sideWidth * 2);
+                if (centerWidth < 100) centerWidth = 100; // 防止负数或过小
+
+                // 3. 在当前位置插入一个 1行3列 的无边框表格
+                Word.Table table = doc.Tables.Add(selection.Range, 1, 3);
+                // 去除表格边框
+                table.Borders.Enable = 0;
+                // 设置整行内容垂直居中
+                table.Rows[1].Cells.VerticalAlignment = Word.WdCellVerticalAlignment.wdCellAlignVerticalCenter;
+
+                // 禁用自动调整并重置表格整体缩进，防止其他文档样式干扰
+                table.AllowAutoFit = false;
+                table.Rows.LeftIndent = 0f;
+
+                // 严格设定三等分/对称的两侧宽度，才能保证中间列绝对在页面中心
+                table.Cell(1, 1).Width = sideWidth;
+                table.Cell(1, 2).Width = centerWidth;
+                table.Cell(1, 3).Width = sideWidth;
+
+                // ==== 处理第一列：左侧占位 ====
+                Word.Cell cellLeft = table.Cell(1, 1);
+                // 取消左侧边距，让未来可能的填充物完全贴合页面最左侧
+                cellLeft.LeftPadding = 0f;
+
+                // ==== 处理第二列：中间区域插入 Display 模式公式 ====
+                Word.Cell cellCenter = table.Cell(1, 2);
+                // 中间列文本水平居中
+                cellCenter.Range.ParagraphFormat.Alignment = Word.WdParagraphAlignment.wdAlignParagraphCenter;
+
+                // 获取中间单元格的开始位置并选中（模拟用户在此处插入）
+                Word.Range rngCenter = cellCenter.Range;
+                rngCenter.Collapse(Word.WdCollapseDirection.wdCollapseStart);
+                rngCenter.Select();
+
+                // 借助 Selection 直接无痕插入空白公式框。
+                // 针对完全 Empty 的 Range，直接 OMaths.Add(Range) 容易导致返回的 Range 是空或 OMaths 集合长度为 0 的异常
+                doc.OMaths.Add(app.Selection.Range);
+
+                // 重新在单元格的作用域内获取被创建的公式
+                Word.OMath mathObj = cellCenter.Range.OMaths[1];
+
+                // 强制设为显示模式 (wdOMathDisplay = 0)，防止在此框架下变成压缩版的行内公式
+                mathObj.Type = Word.WdOMathType.wdOMathDisplay;
+                // mathObj.BuildUp() 被省略，因为对于空的公式框进行 BuildUp 生成二维结构没有必要且容易出错
+
+                // ==== 处理第三列：右侧区域插入编号和括号 ====
+                Word.Cell cellRight = table.Cell(1, 3);
+                // 右边列文本右对齐
+                cellRight.Range.ParagraphFormat.Alignment = Word.WdParagraphAlignment.wdAlignParagraphRight;
+
+                if (numberStyle > 0)
+                {
+                    Word.Range rngRight = cellRight.Range;
+                    rngRight.Collapse(Word.WdCollapseDirection.wdCollapseStart);  // 定位到单元格开始
+
+                    // 插入括号
+                    rngRight.Text = "()";
+
+                    // 将光标定位在左右括号之间，准备插入编号的域代码
+                    Word.Range rngNum = table.Cell(1, 3).Range;
+                    rngNum.Collapse(Word.WdCollapseDirection.wdCollapseStart);
+                    rngNum.Move(Word.WdUnits.wdCharacter, 1);  // 向右移动1个字符，进入 '(' 的右侧
+
+                    // 记录最开始的插入位置，供后续外围包裹书签使用
+                    int bmStartPos = rngNum.Start;
+
+                    Word.Range bmRng;
+
+                    if (numberStyle == 1)
                     {
+                        // 插入纯数字自动编号 (SEQ 域)
+                        Word.Field field = doc.Fields.Add(rngNum, Word.WdFieldType.wdFieldEmpty, @"SEQ 公式 \* ARABIC", false);
+                        Word.Range lastRng = field.Result.Duplicate;
+                        lastRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                        lastRng.Move(Word.WdUnits.wdCharacter, 1);
+                        bmRng = doc.Range(bmStartPos, lastRng.Start);
+                    }
+                    else
+                    {
+                        // 插入章节编号 (如 1.1)：组合 STYLEREF 和 SEQ
+                        Word.Range sepRng;
+
                         // 1. 插入获取标题1编号的域 { STYLEREF "标题 1" \s }
+                        // 即便当前没有编号，也插入该域，以后添加了编号按下更新就能自动出现
                         Word.Field styleField = doc.Fields.Add(rngNum, Word.WdFieldType.wdFieldEmpty, @"STYLEREF ""标题 1"" \s", false);
 
                         // 定位到刚插入的 STYLEREF 域末尾，必须向右移动 1 个字符跳出域的右边界 '}'
                         sepRng = styleField.Result.Duplicate;
                         sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-                        sepRng.Move(Word.WdUnits.wdCharacter, 1); // 【关键修复】：跳出域的作用判定区
+                        sepRng.Move(Word.WdUnits.wdCharacter, 1);
+
+                        // 2. 插入分隔符（这里根据选择不同赋予 . 或是 -）
+                        sepRng.Text = (numberStyle == 2) ? "." : "-";
+
+                        // 定位到分隔符后
+                        Word.Range seqRng = sepRng.Duplicate;
+                        seqRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+
+                        // 3. 插入按一级标题重新计数的 SEQ 域 { SEQ 公式 \* ARABIC \s 1 }
+                        // 注意 \s 1 意思是遇到"标题 1"级别样式就重新开始计数
+                        Word.Field seqField = doc.Fields.Add(seqRng, Word.WdFieldType.wdFieldEmpty, @"SEQ 公式 \* ARABIC \s 1", false);
+
+                        // 为了防止多域范围交叉引起书签在 F9 更新时因跨域而崩溃，需要将整个复合编号从域外的最外围进行完整包裹
+                        Word.Range lastRng = seqField.Result.Duplicate;
+                        lastRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                        lastRng.Move(Word.WdUnits.wdCharacter, 1); // 同样跳出最后一个域的 '}'
+
+                        bmRng = doc.Range(bmStartPos, lastRng.Start);
                     }
-                    else
-                    {
-                        // 标题没有自动编号，直接使用静态的章节数字
-                        rngNum.Text = chapterCount.ToString();
-                        sepRng = rngNum.Duplicate;
-                        sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-                    }
 
-                    // 2. 插入分隔符（这里根据选择不同赋予 . 或是 -）
-                    sepRng.Text = (numberStyle == 2) ? "." : "-";
-
-                    // 定位到分隔符后
-                    Word.Range seqRng = sepRng.Duplicate;
-                    seqRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-
-                    // 3. 插入按一级标题重新计数的 SEQ 域 { SEQ 公式 \* ARABIC \s 1 }
-                    // 注意 \s 1 意思是遇到"标题 1"级别样式就重新开始计数
-                    Word.Field seqField = doc.Fields.Add(seqRng, Word.WdFieldType.wdFieldEmpty, @"SEQ 公式 \* ARABIC \s 1", false);
-
-                    // 为了防止多域范围交叉引起书签在 F9 更新时因跨域而崩溃，需要将整个复合编号从域外的最外围进行完整包裹
-                    Word.Range lastRng = seqField.Result.Duplicate;
-                    lastRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-                    lastRng.Move(Word.WdUnits.wdCharacter, 1); // 同样跳出最后一个域的 '}'
-
-                    bmRng = doc.Range(bmStartPos, lastRng.Start);
+                    // 在插入出来的编号上加盖书签以支持交叉引用
+                    // 书签命名规则必须以 OLE_LINK 开头，Word 插入交叉引用后才能支持 Ctrl+左键 跳转
+                    string bookmarkName = "OLE_LINK" + Guid.NewGuid().ToString("N").Substring(0, 8); 
+                    doc.Bookmarks.Add(bookmarkName, bmRng);
                 }
 
-                // 在插入出来的编号上加盖书签以支持交叉引用
-                // 书签命名规则必须以 OLE_LINK 开头，Word 插入交叉引用后才能支持 Ctrl+左键 跳转
-                string bookmarkName = "OLE_LINK" + Guid.NewGuid().ToString("N").Substring(0, 8); 
-                doc.Bookmarks.Add(bookmarkName, bmRng);
+                // 【核心调整】：彻底消除表格右侧内边距，让编号完全贴合最右边距边缘
+                cellRight.RightPadding = 0f;
+                cellRight.Range.ParagraphFormat.RightIndent = 0f;
+                cellRight.Range.ParagraphFormat.CharacterUnitRightIndent = 0f;
+
+                // 【修复】：确保在写入纯文本和域之后，再对整个右侧单元格强制应用一次右对齐
+                cellRight.Range.ParagraphFormat.Alignment = Word.WdParagraphAlignment.wdAlignParagraphRight;
+                // 顺便确保整个内容的垂直居中
+                cellRight.VerticalAlignment = Word.WdCellVerticalAlignment.wdCellAlignVerticalCenter;
+
+                // 确保编号不为斜体
+                cellRight.Range.Font.Italic = 0;
+
+                // 消除表格后下一个回车可能的斜体属性
+                Word.Range afterTable = table.Range.Duplicate;
+                afterTable.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                afterTable.Font.Italic = 0;
+
+                // 4. 善后：不再增加多余的回车换行，将光标定位在中间列的空公式框内，方便用户直接输入
+                Word.Range inputRng = mathObj.Range;
+                inputRng.Collapse(Word.WdCollapseDirection.wdCollapseStart);
+                inputRng.Select();
             }
-
-            // 【核心调整】：彻底消除表格右侧内边距，让编号完全贴合最右边距边缘
-            cellRight.RightPadding = 0f;
-            cellRight.Range.ParagraphFormat.RightIndent = 0f;
-            cellRight.Range.ParagraphFormat.CharacterUnitRightIndent = 0f;
-
-            // 【修复】：确保在写入纯文本和域之后，再对整个右侧单元格强制应用一次右对齐
-            cellRight.Range.ParagraphFormat.Alignment = Word.WdParagraphAlignment.wdAlignParagraphRight;
-            // 顺便确保整个内容的垂直居中
-            cellRight.VerticalAlignment = Word.WdCellVerticalAlignment.wdCellAlignVerticalCenter;
-
-            // 确保编号不为斜体
-            cellRight.Range.Font.Italic = 0;
-
-            // 消除表格后下一个回车可能的斜体属性
-            Word.Range afterTable = table.Range.Duplicate;
-            afterTable.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-            afterTable.Font.Italic = 0;
-
-            // 4. 善后：不再增加多余的回车换行，将光标定位在中间列的空公式框内，方便用户直接输入
-            Word.Range inputRng = mathObj.Range;
-            inputRng.Collapse(Word.WdCollapseDirection.wdCollapseStart);
-            inputRng.Select();
+            finally
+            {
+                try { app.ScreenUpdating = true; } catch {}
+            }
         }
 
         public void SaveDefaultSettings(int styleIndex, float sideWidth)
@@ -461,19 +485,11 @@ namespace BoType
                 else
                 {
                     Word.Range sepRng;
-                    if (hasAutoNum)
-                    {
-                        Word.Field styleField = doc.Fields.Add(rngNumExisting, Word.WdFieldType.wdFieldEmpty, @"STYLEREF ""标题 1"" \s", false);
-                        sepRng = styleField.Result.Duplicate;
-                        sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-                        sepRng.Move(Word.WdUnits.wdCharacter, 1);
-                    }
-                    else
-                    {
-                        rngNumExisting.Text = chapterCount.ToString();
-                        sepRng = rngNumExisting.Duplicate;
-                        sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-                    }
+                    Word.Field styleField = doc.Fields.Add(rngNumExisting, Word.WdFieldType.wdFieldEmpty, @"STYLEREF ""标题 1"" \s", false);
+                    sepRng = styleField.Result.Duplicate;
+                    sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                    sepRng.Move(Word.WdUnits.wdCharacter, 1);
+
                     sepRng.Text = (numberStyle == 2) ? "." : "-";
                     Word.Range seqRng = sepRng.Duplicate;
                     seqRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
@@ -517,9 +533,25 @@ namespace BoType
             mathToWrap.Range.Select();
             app.Selection.Cut(); // 剪切现有的公式
 
-            Word.PageSetup pageSetup = selection.PageSetup;
+            Word.PageSetup pageSetup;
+            try { pageSetup = selection.Sections[1].PageSetup; } 
+            catch { pageSetup = selection.PageSetup; }
+
+            float pageWidth = pageSetup.PageWidth;
+            float leftMargin = pageSetup.LeftMargin;
+            float rightMargin = pageSetup.RightMargin;
+
+            if (pageWidth >= 999999 || leftMargin >= 999999 || rightMargin >= 999999)
+            {
+                pageWidth = 595.0f;
+                leftMargin = 90.0f;
+                rightMargin = 90.0f;
+            }
+
             // 右两侧专用于编号和占位的列宽
-            float centerWidth = pageSetup.PageWidth - pageSetup.LeftMargin - pageSetup.RightMargin - (sideWidth * 2);
+            float usableWidth = pageWidth - leftMargin - rightMargin;
+            float centerWidth = usableWidth - (sideWidth * 2);
+            if (centerWidth < 100) centerWidth = 100;
 
             Word.Table table = doc.Tables.Add(selection.Range, 1, 3);
             table.Borders.Enable = 0;
@@ -569,19 +601,10 @@ namespace BoType
             else
             {
                 Word.Range sepRng;
-                if (hasAutoNum)
-                {
-                    Word.Field styleField = doc.Fields.Add(rngNum, Word.WdFieldType.wdFieldEmpty, @"STYLEREF ""标题 1"" \s", false);
-                    sepRng = styleField.Result.Duplicate;
-                    sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-                    sepRng.Move(Word.WdUnits.wdCharacter, 1);
-                }
-                else
-                {
-                    rngNum.Text = chapterCount.ToString();
-                    sepRng = rngNum.Duplicate;
-                    sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-                }
+                Word.Field styleField = doc.Fields.Add(rngNum, Word.WdFieldType.wdFieldEmpty, @"STYLEREF ""标题 1"" \s", false);
+                sepRng = styleField.Result.Duplicate;
+                sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                sepRng.Move(Word.WdUnits.wdCharacter, 1);
 
                 sepRng.Text = (numberStyle == 2) ? "." : "-";
                 Word.Range seqRng = sepRng.Duplicate;
