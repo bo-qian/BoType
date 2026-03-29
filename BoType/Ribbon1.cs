@@ -13,13 +13,25 @@ namespace BoType
         {
             int defaultStyle = Globals.ThisAddIn.LoadDefaultNumberStyle();
             this.dropDown1.SelectedItemIndex = (defaultStyle >= 0 && defaultStyle < 4) ? defaultStyle : 1;
+
+            float defaultWidth = Globals.ThisAddIn.LoadDefaultSideWidth();
+            this.editBoxWidth.Text = defaultWidth.ToString();
+        }
+
+        private float GetSideWidth()
+        {
+            if (float.TryParse(this.editBoxWidth.Text, out float width) && width > 0)
+            {
+                return width;
+            }
+            return 38.0f; // 默认值
         }
 
         private void button1_Click(object sender, RibbonControlEventArgs e)
         {
             int styleIndex = this.dropDown1.SelectedItemIndex;
             if (styleIndex < 0) styleIndex = 1; // 默认选择纯数字(1)
-            Globals.ThisAddIn.InsertNumberedEquation(styleIndex);
+            Globals.ThisAddIn.InsertNumberedEquation(styleIndex, GetSideWidth());
         }
 
         private void button2_Click(object sender, RibbonControlEventArgs e)
@@ -35,15 +47,15 @@ namespace BoType
                 System.Windows.Forms.MessageBox.Show("请选择一个带有编号的样式（非无）。", "BoType - 提示");
                 return;
             }
-            Globals.ThisAddIn.WrapSelectedEquation(styleIndex);
+            Globals.ThisAddIn.WrapSelectedEquation(styleIndex, GetSideWidth());
         }
 
         private void button6_Click(object sender, RibbonControlEventArgs e)
         {
             int styleIndex = this.dropDown1.SelectedItemIndex;
             if (styleIndex < 0) styleIndex = 1;
-            Globals.ThisAddIn.SaveDefaultNumberStyle(styleIndex);
-            System.Windows.Forms.MessageBox.Show("已将所选编号样式设为开启软件时的默认样式。", "BoType - 提示");
+            Globals.ThisAddIn.SaveDefaultSettings(styleIndex, GetSideWidth());
+            System.Windows.Forms.MessageBox.Show("已将所选编号样式和占位宽度设为开启软件时的默认样式。", "BoType - 提示");
         }
 
         private void button3_Click(object sender, RibbonControlEventArgs e)

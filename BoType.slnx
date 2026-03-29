@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="BoType/BoType.csproj" Id="82b0f021-fa58-44b9-a579-1304e3c93ea9" />
-  <Project Path="BoTypeSetup/BoTypeSetup.vdproj" Type="Installer" />
+  <Project Path="BoTypeSetup/BoTypeSetup.vdproj" Type="Installer">
+    <Build />
+  </Project>
 </Solution>

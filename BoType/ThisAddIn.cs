@@ -73,21 +73,39 @@ namespace BoType
             else
             {
                 hasAutoNum = false;
-                Word.Range countRng = doc.Range(0, findRng.End);
-                countRng.Find.ClearFormatting();
-                countRng.Find.set_Style(Word.WdBuiltinStyle.wdStyleHeading1);
-                countRng.Find.Text = "";
-                countRng.Find.Forward = true;
-                countRng.Find.Wrap = Word.WdFindWrap.wdFindStop;
-                countRng.Find.Format = true;
 
-                int count = 0;
-                while (countRng.Find.Execute())
+                string headingText = null;
+                try { headingText = findRng.Text?.Trim(); } catch { }
+                bool hasExplicitNum = false;
+
+                if (!string.IsNullOrEmpty(headingText))
                 {
-                    if (countRng.Start > findRng.Start) break;
-                    count++;
+                    var match = System.Text.RegularExpressions.Regex.Match(headingText, @"^(?:第)?\s*(\d+)");
+                    if (match.Success && int.TryParse(match.Groups[1].Value, out int explicitNum))
+                    {
+                        chapterCount = explicitNum;
+                        hasExplicitNum = true;
+                    }
                 }
-                chapterCount = count > 0 ? count : 1;
+
+                if (!hasExplicitNum)
+                {
+                    Word.Range countRng = doc.Range(0, findRng.End);
+                    countRng.Find.ClearFormatting();
+                    countRng.Find.set_Style(Word.WdBuiltinStyle.wdStyleHeading1);
+                    countRng.Find.Text = "";
+                    countRng.Find.Forward = true;
+                    countRng.Find.Wrap = Word.WdFindWrap.wdFindStop;
+                    countRng.Find.Format = true;
+
+                    int count = 0;
+                    while (countRng.Find.Execute())
+                    {
+                        if (countRng.Start > findRng.Start) break;
+                        count++;
+                    }
+                    chapterCount = count > 0 ? count : 1;
+                }
             }
             return true;
         }
@@ -96,7 +114,7 @@ namespace BoType
         /// 插入单行编号公式 (三栏表格模式)
         /// </summary>
         /// <param name="numberStyle">0: 无, 1: (1), 2: (1.1), 3: (1-1)</param>
-        public void InsertNumberedEquation(int numberStyle = 1)
+        public void InsertNumberedEquation(int numberStyle = 1, float sideWidth = 38.0f)
         {
             Word.Application app = this.Application;
             if (app.Documents.Count == 0) return;
@@ -139,8 +157,7 @@ namespace BoType
 
             // 2. 计算可用的排版宽度
             float usableWidth = pageWidth - leftMargin - rightMargin;
-            // 定义左右两侧专用于编号和占位的列宽 (例如固定为 50 磅)
-            float sideWidth = 50.0f;
+            // 定义左右两侧专用于编号和占位的列宽
             float centerWidth = usableWidth - (sideWidth * 2);
 
             // 3. 在当前位置插入一个 1行3列 的无边框表格
@@ -289,6 +306,20 @@ namespace BoType
             inputRng.Select();
         }
 
+        public void SaveDefaultSettings(int styleIndex, float sideWidth)
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\BoTypeAddIn"))
+                {
+                    key.SetValue("DefaultNumberStyle", styleIndex);
+                    // 注册表默认存整型或字符串，这里可存为字符串
+                    key.SetValue("DefaultSideWidth", sideWidth.ToString());
+                }
+            }
+            catch { }
+        }
+
         public void SaveDefaultNumberStyle(int styleIndex)
         {
             try
@@ -317,7 +348,27 @@ namespace BoType
             return 1; // 默认为 (1)
         }
 
-        public void WrapSelectedEquation(int numberStyle)
+        public float LoadDefaultSideWidth()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\BoTypeAddIn"))
+                {
+                    if (key != null)
+                    {
+                        string val = key.GetValue("DefaultSideWidth") as string;
+                        if (!string.IsNullOrEmpty(val) && float.TryParse(val, out float width))
+                        {
+                            return width;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return 38.0f; // 默认为 38.0
+        }
+
+        public void WrapSelectedEquation(int numberStyle, float sideWidth = 38.0f)
         {
             if (numberStyle <= 0) return;
 
@@ -467,7 +518,7 @@ namespace BoType
             app.Selection.Cut(); // 剪切现有的公式
 
             Word.PageSetup pageSetup = selection.PageSetup;
-            float sideWidth = 50.0f;
+            // 右两侧专用于编号和占位的列宽
             float centerWidth = pageSetup.PageWidth - pageSetup.LeftMargin - pageSetup.RightMargin - (sideWidth * 2);
 
             Word.Table table = doc.Tables.Add(selection.Range, 1, 3);

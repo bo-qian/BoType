@@ -43,7 +43,9 @@
             this.button1 = this.Factory.CreateRibbonButton();
             this.button2 = this.Factory.CreateRibbonButton();
             this.group2 = this.Factory.CreateRibbonGroup();
+            this.box1 = this.Factory.CreateRibbonBox();
             this.dropDown1 = this.Factory.CreateRibbonDropDown();
+            this.editBoxWidth = this.Factory.CreateRibbonEditBox();
             this.button5 = this.Factory.CreateRibbonButton();
             this.button6 = this.Factory.CreateRibbonButton();
             this.group3 = this.Factory.CreateRibbonGroup();
@@ -52,6 +54,7 @@
             this.tab1.SuspendLayout();
             this.group1.SuspendLayout();
             this.group2.SuspendLayout();
+            this.box1.SuspendLayout();
             this.group3.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -90,11 +93,18 @@
             // 
             // group2
             // 
-            this.group2.Items.Add(this.dropDown1);
-            this.group2.Items.Add(this.button5);
-            this.group2.Items.Add(this.button6);
+            this.group2.Items.Add(this.box1);
             this.group2.Label = "公式编号";
             this.group2.Name = "group2";
+            // 
+            // box1
+            // 
+            this.box1.BoxStyle = Microsoft.Office.Tools.Ribbon.RibbonBoxStyle.Vertical;
+            this.box1.Items.Add(this.dropDown1);
+            this.box1.Items.Add(this.editBoxWidth);
+            this.box1.Items.Add(this.button5);
+            this.box1.Items.Add(this.button6);
+            this.box1.Name = "box1";
             // 
             // dropDown1
             // 
@@ -110,7 +120,15 @@
             this.dropDown1.Name = "dropDown1";
             this.dropDown1.OfficeImageId = "NumberingGallery";
             this.dropDown1.ShowImage = true;
-            //
+            // 
+            // editBoxWidth
+            // 
+            this.editBoxWidth.Label = "编号占位:";
+            this.editBoxWidth.Name = "editBoxWidth";
+            this.editBoxWidth.OfficeImageId = "SizeToControlWidth";
+            this.editBoxWidth.ShowImage = true;
+            this.editBoxWidth.Text = "38";
+            // 
             // button5
             // 
             this.button5.Label = "给公式编号";
@@ -126,7 +144,7 @@
             this.button6.OfficeImageId = "SetAsDefault";
             this.button6.ShowImage = true;
             this.button6.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.button6_Click);
-            //
+            // 
             // group3
             // 
             this.group3.Items.Add(this.button3);
@@ -164,6 +182,8 @@
             this.group1.PerformLayout();
             this.group2.ResumeLayout(false);
             this.group2.PerformLayout();
+            this.box1.ResumeLayout(false);
+            this.box1.PerformLayout();
             this.group3.ResumeLayout(false);
             this.group3.PerformLayout();
             this.ResumeLayout(false);
@@ -177,7 +197,9 @@
         internal Microsoft.Office.Tools.Ribbon.RibbonButton button1;
         internal Microsoft.Office.Tools.Ribbon.RibbonButton button2;
         internal Microsoft.Office.Tools.Ribbon.RibbonGroup group2;
+        internal Microsoft.Office.Tools.Ribbon.RibbonBox box1;
         internal Microsoft.Office.Tools.Ribbon.RibbonDropDown dropDown1;
+        internal Microsoft.Office.Tools.Ribbon.RibbonEditBox editBoxWidth;
         internal Microsoft.Office.Tools.Ribbon.RibbonButton button5;
         internal Microsoft.Office.Tools.Ribbon.RibbonButton button6;
         internal Microsoft.Office.Tools.Ribbon.RibbonGroup group3;
