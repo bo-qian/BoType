@@ -41,3 +41,25 @@
 ## 📄 许可证 (License)
 
 本项目采用 [MIT License](LICENSE) 许可协议。
+
+## 🔐 安装签名证书（仅当安装提示证书不受信任时需要）
+
+如果用户在运行 `setup.exe` 时收到“证书不受信任”或类似 SecurityException，可按以下方式快速信任自签名证书（适用于内部测试）。
+
+1. 从本 Release 下载并解压所有文件，确保 `BoType_TemporaryKey.pfx` 与 `tools` 目录在同一目录下。
+2. 以管理员身份打开 PowerShell（右键 PowerShell -> 以管理员身份运行）。
+3. 运行一键脚本（会导入证书并启动安装程序）：
+
+   ```powershell
+   pwsh -ExecutionPolicy Bypass -File .\tools\install_and_run_setup.ps1 -PfxPath ".\BoType\BoType_TemporaryKey.pfx" -PfxPassword "123456" -SetupPath ".\BoType\publish\setup.exe"
+   ```
+
+4. 脚本执行完毕后，即可正常运行安装程序而不会再出现“不受信任证书”的错误。
+
+如果你只想单独信任公钥（管理员可先信任证书再手动运行安装程序）：
+
+```powershell
+pwsh -ExecutionPolicy Bypass -File .\tools\install_public_cert.ps1 -CerPath ".\BoType\BoType_TemporaryKey.cer"
+```
+
+注意：以上为自签名证书的临时解决方案，适合内部或测试环境。对外发布请务必使用受信任 CA 签发的代码签名证书。
