@@ -102,8 +102,8 @@
             this.box1.BoxStyle = Microsoft.Office.Tools.Ribbon.RibbonBoxStyle.Vertical;
             this.box1.Items.Add(this.dropDown1);
             this.box1.Items.Add(this.editBoxWidth);
-            this.box1.Items.Add(this.button5);
             this.box1.Items.Add(this.button6);
+            this.box1.Items.Add(this.button5);
             this.box1.Name = "box1";
             // 
             // dropDown1
@@ -123,7 +123,7 @@
             // 
             // editBoxWidth
             // 
-            this.editBoxWidth.Label = "编号占位:";
+            this.editBoxWidth.Label = "编号占位(磅):";
             this.editBoxWidth.Name = "editBoxWidth";
             this.editBoxWidth.OfficeImageId = "SizeToControlWidth";
             this.editBoxWidth.ShowImage = true;
