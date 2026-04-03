@@ -7,6 +7,7 @@ DefaultDirName={autopf}\BoType
 DefaultGroupName=BoType
 OutputDir=.\
 OutputBaseFilename=BoType_Setup_v2.0.1
+SetupIconFile=BoType\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
