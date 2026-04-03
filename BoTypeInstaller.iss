@@ -1,0 +1,37 @@
+[Setup]
+AppName=BoType Word Add-in
+AppVersion=2.0.0
+AppPublisher=BoType
+AppPublisherURL=https://github.com/bo-qian/BoType
+DefaultDirName={autopf}\BoType
+DefaultGroupName=BoType
+OutputDir=.\
+OutputBaseFilename=BoType_Setup_v2.0.0
+Compression=lzma2/ultra64
+SolidCompression=yes
+ArchitecturesInstallIn64BitMode=x64
+DisableDirPage=no
+DisableProgramGroupPage=yes
+PrivilegesRequired=admin
+
+[Files]
+Source: "Publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Registry]
+; HKEY_LOCAL_MACHINE - for all users on the PC. Installing to Program Files means we avoid the strict Certificate Trust verification Office normally imposes on AppData/Downloads directories!
+Root: HKLM; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "Description"; ValueData: "BoType Word Add-in"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "FriendlyName"; ValueData: "BoType Word Add-in"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: dword; ValueName: "LoadBehavior"; ValueData: 3; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "Manifest"; ValueData: "file:///{app}\BoType.vsto|vstolocal"; Flags: uninsdeletekey
+
+; Create the same registry keys in WOW6432Node for 32-bit Office running on 64-bit Windows.
+Root: HKLM32; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "Description"; ValueData: "BoType Word Add-in"; Flags: uninsdeletekey; Check: IsWin64
+Root: HKLM32; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "FriendlyName"; ValueData: "BoType Word Add-in"; Flags: uninsdeletekey; Check: IsWin64
+Root: HKLM32; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: dword; ValueName: "LoadBehavior"; ValueData: 3; Flags: uninsdeletevalue; Check: IsWin64
+Root: HKLM32; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "Manifest"; ValueData: "file:///{app}\BoType.vsto|vstolocal"; Flags: uninsdeletekey; Check: IsWin64
+
+[Run]
+; Run Word if the user wants? We won't strictly enforce it.
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}"
