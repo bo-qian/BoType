@@ -53,13 +53,15 @@ namespace BoType
             item0.Label = $"({ph})";
             this.dropDownRefStyle.Items.Add(item0);
 
-            var item1 = this.Factory.CreateRibbonDropDownItem();
-            item1.Label = $"({ph})";
+            var item1 = factory.CreateRibbonDropDownItem();
+            item1.Label = $"{ph}";
+            this.dropDownRefStyle.Items.Add(item1);
 
-            var item2 = this.Factory.CreateRibbonDropDownItem();
+            var item2 = factory.CreateRibbonDropDownItem();
             item2.Label = $"Eq. {ph}";
+            this.dropDownRefStyle.Items.Add(item2);
 
-            var item3 = this.Factory.CreateRibbonDropDownItem();
+            var item3 = factory.CreateRibbonDropDownItem();
             item3.Label = $"Equation {ph}";
             this.dropDownRefStyle.Items.Add(item3);
 
@@ -243,7 +245,7 @@ namespace BoType
             bool withParens = false;
 
             if (refStyleIndex == 0) { prefix = ""; withParens = true; }
-            else if (refStyleIndex == 1) { prefix = ""; withParens = true; }
+            else if (refStyleIndex == 1) { prefix = ""; withParens = false; }
             else if (refStyleIndex == 2) { prefix = "Eq. "; withParens = false; }
             else if (refStyleIndex == 3) { prefix = "Equation "; withParens = false; }
             else if (refStyleIndex == 4) { prefix = "公式 "; withParens = false; }
