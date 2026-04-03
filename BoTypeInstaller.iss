@@ -1,12 +1,12 @@
 [Setup]
 AppName=BoType Word Add-in
-AppVersion=2.0.0
+AppVersion=2.0.1
 AppPublisher=BoType
 AppPublisherURL=https://github.com/bo-qian/BoType
 DefaultDirName={autopf}\BoType
 DefaultGroupName=BoType
 OutputDir=.\
-OutputBaseFilename=BoType_Setup_v2.0.0
+OutputBaseFilename=BoType_Setup_v2.0.1
 Compression=lzma2/ultra64
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
