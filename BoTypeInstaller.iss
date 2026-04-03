@@ -19,6 +19,9 @@ Source: "BoType\bin\Release\*"; DestDir: "{app}"; Excludes: "app.publish\*"; Fla
 Source: "BoType\BoType_TemporaryKey.cer"; DestDir: "{app}"; Flags: ignoreversion
 
 [Registry]
+; Remove any residual ClickOnce or conflicting per-user registry keys to ensure HKLM takes precedence
+Root: HKCU; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; Flags: deletekey dontcreatekey uninsdeletekey
+
 Root: HKLM; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "Description"; ValueData: "BoType Word Add-in"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "FriendlyName"; ValueData: "BoType Word Add-in"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: dword; ValueName: "LoadBehavior"; ValueData: 3; Flags: uninsdeletevalue
