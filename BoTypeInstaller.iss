@@ -15,11 +15,17 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 
 [Files]
-Source: "Publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "Publish\Application Files\BoType_2_0_0_0\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "BoType\BoType_TemporaryKey.cer"; DestDir: "{app}"; Flags: ignoreversion
 
 [Registry]
-; HKEY_LOCAL_MACHINE - for all users on the PC. Installing to Program Files means we avoid the strict Certificate Trust verification Office normally imposes on AppData/Downloads directories!
+; Write to HKEY_CURRENT_USER instead of HKLM to bypass extreme LocalMachine protection that silently fails COM loading in Word.
+Root: HKCU; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "Description"; ValueData: "BoType Word Add-in"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "FriendlyName"; ValueData: "BoType Word Add-in"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: dword; ValueName: "LoadBehavior"; ValueData: 3; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "Manifest"; ValueData: "file:///{app}\BoType.vsto|vstolocal"; Flags: uninsdeletekey
+
+; Keep HKLM just in case as a fallback
 Root: HKLM; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "Description"; ValueData: "BoType Word Add-in"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: string; ValueName: "FriendlyName"; ValueData: "BoType Word Add-in"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\Microsoft\Office\Word\Addins\BoType"; ValueType: dword; ValueName: "LoadBehavior"; ValueData: 3; Flags: uninsdeletevalue
