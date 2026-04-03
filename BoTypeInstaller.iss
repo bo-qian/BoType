@@ -15,7 +15,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 
 [Files]
-Source: "Publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "Publish\Application Files\BoType_2_0_0_0\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "BoType\BoType_TemporaryKey.cer"; DestDir: "{app}"; Flags: ignoreversion
 
 [Registry]
