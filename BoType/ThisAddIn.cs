@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -53,12 +53,12 @@ namespace BoType
             }
         }
 
-        private bool TryGetChapterInfo(Word.Document doc, Word.Selection selection, out bool hasAutoNum, out int chapterCount)
+        private bool TryGetChapterInfo(Word.Document doc, Word.Range selectionRange, out bool hasAutoNum, out int chapterCount)
         {
             hasAutoNum = false;
             chapterCount = 0;
 
-            Word.Range findRng = selection.Range.Duplicate;
+            Word.Range findRng = selectionRange.Duplicate;
             findRng.Collapse(Word.WdCollapseDirection.wdCollapseStart);
             findRng.Find.ClearFormatting();
             findRng.Find.set_Style(Word.WdBuiltinStyle.wdStyleHeading1);
@@ -138,9 +138,8 @@ namespace BoType
             int chapterCount = 1;
             if (numberStyle > 1)
             {
-                if (!TryGetChapterInfo(doc, selection, out hasAutoNum, out chapterCount))
+                if (!TryGetChapterInfo(doc, selection.Range, out hasAutoNum, out chapterCount))
                 {
-                    System.Windows.Forms.MessageBox.Show("当前位置前面没有任何一级标题，不允许使用带章节的编号。", "BoType - 错误");
                     return;
                 }
             }
@@ -240,16 +239,18 @@ namespace BoType
                     Word.Range rngRight = cellRight.Range;
                     rngRight.Collapse(Word.WdCollapseDirection.wdCollapseStart);  // 定位到单元格开始
 
-                    // 插入括号
-                    rngRight.Text = "()";
+                    // 在单元格中先插入完整的括号框架，确保首尾绝对文本隔离
+                    rngRight.Text = "( )";
 
-                    // 将光标定位在左右括号之间，准备插入编号的域代码
+                    // 将光标定位在左右括号之间，留出的那个空格处准备插入编号域
                     Word.Range rngNum = table.Cell(1, 3).Range;
                     rngNum.Collapse(Word.WdCollapseDirection.wdCollapseStart);
-                    rngNum.Move(Word.WdUnits.wdCharacter, 1);  // 向右移动1个字符，进入 '(' 的右侧
+                    rngNum.Move(Word.WdUnits.wdCharacter, 1);
+                    Word.Range insertRng = doc.Range(rngNum.Start, rngNum.Start + 1);
+                    insertRng.Text = ""; // 清除临时空格
 
-                    // 记录最开始的插入位置，供后续外围包裹书签使用
-                    int bmStartPos = rngNum.Start;
+                    // 重新记录插入位置，供后续书签使用。此时光标正好在 ( 之后
+                    int bmStartPos = insertRng.Start;
 
                     Word.Range bmRng;
 
@@ -267,14 +268,19 @@ namespace BoType
                         // 插入章节编号 (如 1.1)：组合 STYLEREF 和 SEQ
                         Word.Range sepRng;
 
-                        // 1. 插入获取标题1编号的域 { STYLEREF "标题 1" \s }
-                        // 即便当前没有编号，也插入该域，以后添加了编号按下更新就能自动出现
-                        Word.Field styleField = doc.Fields.Add(rngNum, Word.WdFieldType.wdFieldEmpty, @"STYLEREF ""标题 1"" \s", false);
-
-                        // 定位到刚插入的 STYLEREF 域末尾，必须向右移动 1 个字符跳出域的右边界 '}'
-                        sepRng = styleField.Result.Duplicate;
-                        sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-                        sepRng.Move(Word.WdUnits.wdCharacter, 1);
+                        if (hasAutoNum)
+                        {
+                            Word.Field styleField = doc.Fields.Add(rngNum, Word.WdFieldType.wdFieldEmpty, @"STYLEREF ""标题 1"" \s", false);
+                            sepRng = styleField.Result.Duplicate;
+                            sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                            sepRng.Move(Word.WdUnits.wdCharacter, 1);
+                        }
+                        else
+                        {
+                            sepRng = rngNum.Duplicate;
+                            sepRng.Text = chapterCount.ToString();
+                            sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                        }
 
                         // 2. 插入分隔符（这里根据选择不同赋予 . 或是 -）
                         sepRng.Text = (numberStyle == 2) ? "." : "-";
@@ -284,10 +290,8 @@ namespace BoType
                         seqRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
 
                         // 3. 插入按一级标题重新计数的 SEQ 域 { SEQ 公式 \* ARABIC \s 1 }
-                        // 注意 \s 1 意思是遇到"标题 1"级别样式就重新开始计数
                         Word.Field seqField = doc.Fields.Add(seqRng, Word.WdFieldType.wdFieldEmpty, @"SEQ 公式 \* ARABIC \s 1", false);
 
-                        // 为了防止多域范围交叉引起书签在 F9 更新时因跨域而崩溃，需要将整个复合编号从域外的最外围进行完整包裹
                         Word.Range lastRng = seqField.Result.Duplicate;
                         lastRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
                         lastRng.Move(Word.WdUnits.wdCharacter, 1); // 同样跳出最后一个域的 '}'
@@ -356,6 +360,38 @@ namespace BoType
             catch { }
         }
 
+        public void SaveDefaultRefStyle(int styleIndex)
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\BoTypeAddIn"))
+                {
+                    key.SetValue("DefaultRefStyle", styleIndex);
+                }
+            }
+            catch { }
+        }
+
+        public int LoadDefaultRefStyle()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\BoTypeAddIn"))
+                {
+                    if (key != null)
+                    {
+                        object val = key.GetValue("DefaultRefStyle");
+                        if (val != null)
+                        {
+                            return (int)val;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return 0; // 默认为第0个样式
+        }
+
         public int LoadDefaultNumberStyle()
         {
             try
@@ -406,9 +442,8 @@ namespace BoType
             int chapterCount = 1;
             if (numberStyle > 1)
             {
-                if (!TryGetChapterInfo(doc, selection, out hasAutoNum, out chapterCount))
+                if (!TryGetChapterInfo(doc, selection.Range, out hasAutoNum, out chapterCount))
                 {
-                    System.Windows.Forms.MessageBox.Show("当前位置前面没有任何一级标题，不允许使用带章节的编号。", "BoType - 错误");
                     return;
                 }
             }
@@ -454,24 +489,24 @@ namespace BoType
                 bool oldShowHidden = false;
                 try { oldShowHidden = doc.Bookmarks.ShowHidden; doc.Bookmarks.ShowHidden = true; } catch { }
 
-                // 记录已有的书签及其范围类型（是否包裹了外层的括号）
-                Dictionary<string, bool> bookmarkCoverage = new Dictionary<string, bool>();
+                // 记录已有书签名称，统一恢复为“仅编号内容”范围，避免交叉引用“仅标签和序号”出现括号
+                List<string> bookmarkNames = new List<string>();
                 foreach (Word.Bookmark bm in cellRightExisting.Range.Bookmarks)
                 {
-                    // 判断书签是否从单元格最左侧或者更左侧开始（包含了左括号）
-                    bool coversParentheses = (bm.Range.Start <= rightRange.Start);
-                    bookmarkCoverage[bm.Name] = coversParentheses;
+                    bookmarkNames.Add(bm.Name);
                 }
 
                 try { doc.Bookmarks.ShowHidden = oldShowHidden; } catch { }
 
-                // 删除旧的括号和编号
-                rightRange.Text = "()";
+                // 重新插入完整的括号框架进行范围保护
+                rightRange.Text = "( )";
 
                 Word.Range rngNumExisting = existingTable.Cell(1, 3).Range;
                 rngNumExisting.Collapse(Word.WdCollapseDirection.wdCollapseStart);
                 rngNumExisting.Move(Word.WdUnits.wdCharacter, 1);
-                int bmStartPosExisting = rngNumExisting.Start;
+                Word.Range insertRngExisting = doc.Range(rngNumExisting.Start, rngNumExisting.Start + 1);
+                insertRngExisting.Text = ""; // 清除临时空格
+                int bmStartPosExisting = insertRngExisting.Start;
                 Word.Range bmRngExisting;
 
                 if (numberStyle == 1)
@@ -485,10 +520,20 @@ namespace BoType
                 else
                 {
                     Word.Range sepRng;
-                    Word.Field styleField = doc.Fields.Add(rngNumExisting, Word.WdFieldType.wdFieldEmpty, @"STYLEREF ""标题 1"" \s", false);
-                    sepRng = styleField.Result.Duplicate;
-                    sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
-                    sepRng.Move(Word.WdUnits.wdCharacter, 1);
+                    
+                    if (hasAutoNum)
+                    {
+                        Word.Field styleField = doc.Fields.Add(rngNumExisting, Word.WdFieldType.wdFieldEmpty, @"STYLEREF ""标题 1"" \s", false);
+                        sepRng = styleField.Result.Duplicate;
+                        sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                        sepRng.Move(Word.WdUnits.wdCharacter, 1);
+                    }
+                    else
+                    {
+                        sepRng = rngNumExisting.Duplicate;
+                        sepRng.Text = chapterCount.ToString();
+                        sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                    }
 
                     sepRng.Text = (numberStyle == 2) ? "." : "-";
                     Word.Range seqRng = sepRng.Duplicate;
@@ -501,23 +546,11 @@ namespace BoType
                     bmRngExisting = doc.Range(bmStartPosExisting, lastRng.Start);
                 }
 
-                if (bookmarkCoverage.Count > 0)
+                if (bookmarkNames.Count > 0)
                 {
-                    Word.Range outerRng = existingTable.Cell(1, 3).Range;
-                    outerRng.End -= 1; // 整个连带外层括号的范围
-
-                    foreach (var kvp in bookmarkCoverage)
+                    foreach (string existingBookmarkName in bookmarkNames)
                     {
-                        if (kvp.Value)
-                        {
-                            // 还原包裹了括号的整段书签（如自动交叉引用生成的 _Ref 书签）
-                            doc.Bookmarks.Add(kvp.Key, outerRng);
-                        }
-                        else
-                        {
-                            // 还原仅包裹内部域代码的书签（如原生 OLE_LINK 书签）
-                            doc.Bookmarks.Add(kvp.Key, bmRngExisting);
-                        }
+                        doc.Bookmarks.Add(existingBookmarkName, bmRngExisting);
                     }
                 }
                 else
@@ -581,13 +614,15 @@ namespace BoType
 
             Word.Range rngRight = cellRight.Range;
             rngRight.Collapse(Word.WdCollapseDirection.wdCollapseStart);
-            rngRight.Text = "()";
+            rngRight.Text = "( )";
 
             Word.Range rngNum = table.Cell(1, 3).Range;
             rngNum.Collapse(Word.WdCollapseDirection.wdCollapseStart);
             rngNum.Move(Word.WdUnits.wdCharacter, 1);
+            Word.Range insertRng = doc.Range(rngNum.Start, rngNum.Start + 1);
+            insertRng.Text = ""; // 清除临时空格
 
-            int bmStartPos = rngNum.Start;
+            int bmStartPos = insertRng.Start;
             Word.Range bmRng;
 
             if (numberStyle == 1)
@@ -637,6 +672,181 @@ namespace BoType
             inputRng.Select();
         }
 
+        public void NormalizeCurrentDocumentEquationBookmarks()
+        {
+            Word.Application app = this.Application;
+            if (app.Documents.Count == 0) return;
+
+            Word.Document doc = app.ActiveDocument;
+
+            bool oldShowHidden = false;
+            try { oldShowHidden = doc.Bookmarks.ShowHidden; doc.Bookmarks.ShowHidden = true; } catch { }
+
+            try
+            {
+                foreach (Word.Table table in doc.Tables)
+                {
+                    if (table.Rows.Count != 1 || table.Columns.Count != 3) continue;
+
+                    Word.Cell centerCell;
+                    Word.Cell rightCell;
+                    try
+                    {
+                        centerCell = table.Cell(1, 2);
+                        rightCell = table.Cell(1, 3);
+                    }
+                    catch { continue; }
+
+                    if (centerCell.Range.OMaths.Count == 0) continue;
+
+                    Word.Range rightContent = rightCell.Range.Duplicate;
+                    rightContent.End -= 1;
+                    if (rightContent.End <= rightContent.Start) continue;
+
+                    int numberStart = rightContent.Start;
+                    int numberEnd = rightContent.End;
+
+                    string leftChar = doc.Range(numberStart, numberStart + 1).Text;
+                    if (leftChar == "(" || leftChar == "（") numberStart++;
+
+                    if (numberEnd > numberStart)
+                    {
+                        string rightChar = doc.Range(numberEnd - 1, numberEnd).Text;
+                        if (rightChar == ")" || rightChar == "）") numberEnd--;
+                    }
+
+                    if (numberEnd <= numberStart) continue;
+
+                    Word.Range pureNumberRange = doc.Range(numberStart, numberEnd);
+
+                    foreach (Word.Bookmark bm in rightCell.Range.Bookmarks)
+                    {
+                        try
+                        {
+                            bm.Range.SetRange(numberStart, numberEnd);
+                        }
+                        catch { }
+                    }
+                }
+            }
+            finally
+            {
+                try { doc.Bookmarks.ShowHidden = oldShowHidden; } catch { }
+            }
+        }
+
+        public void UpdateEquationChapterNumbers()
+        {
+            Word.Application app = this.Application;
+            if (app.Documents.Count == 0) return;
+
+            try
+            {
+                app.ScreenUpdating = false;
+                Word.Document doc = app.ActiveDocument;
+
+                bool oldShowHidden = false;
+                try { oldShowHidden = doc.Bookmarks.ShowHidden; doc.Bookmarks.ShowHidden = true; } catch { }
+
+                try
+                {
+                    foreach (Word.Table table in doc.Tables)
+                    {
+                        if (table.Rows.Count != 1 || table.Columns.Count != 3) continue;
+
+                        Word.Cell centerCell;
+                        Word.Cell rightCell;
+                        try
+                        {
+                            centerCell = table.Cell(1, 2);
+                            rightCell = table.Cell(1, 3);
+                        }
+                        catch { continue; }
+
+                        if (centerCell.Range.OMaths.Count == 0) continue;
+
+                        // Identify the bookmark
+                        string bmName = null;
+                        Word.Bookmark targetBm = null;
+                        foreach (Word.Bookmark bm in rightCell.Range.Bookmarks)
+                        {
+                            if (bm.Name.StartsWith("OLE_LINK") || bm.Name.StartsWith("公式"))
+                            {
+                                bmName = bm.Name;
+                                targetBm = bm;
+                                break;
+                            }
+                        }
+
+                        if (targetBm != null)
+                        {
+                            Word.Range bmRange = targetBm.Range;
+                            string text = bmRange.Text;
+
+                            if (string.IsNullOrEmpty(text)) continue;
+
+                            int numberStyle = 1;
+                            if (text.Contains(".")) numberStyle = 2;
+                            else if (text.Contains("-")) numberStyle = 3;
+
+                            if (numberStyle > 1)
+                            {
+                                if (!TryGetChapterInfo(doc, table.Range, out bool hasAutoNum, out int chapterCount))
+                                {
+                                    continue;
+                                }
+
+                                // We reconstruct the numbering inside the entire bookmark
+                                Word.Range rngNum = targetBm.Range;
+                                rngNum.Text = ""; // Clear existing bookmark content
+
+                                // Re-inserting will lose the bookmark, we need to know start pos
+                                int bmStartPos = rngNum.Start;
+                                Word.Range sepRng;
+
+                                if (hasAutoNum)
+                                {
+                                    Word.Field styleField = doc.Fields.Add(rngNum, Word.WdFieldType.wdFieldEmpty, @"STYLEREF ""标题 1"" \s", false);
+                                    sepRng = styleField.Result.Duplicate;
+                                    sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                                    sepRng.Move(Word.WdUnits.wdCharacter, 1);
+                                }
+                                else
+                                {
+                                    sepRng = rngNum.Duplicate;
+                                    sepRng.Text = chapterCount.ToString();
+                                    sepRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                                }
+
+                                sepRng.Text = (numberStyle == 2) ? "." : "-";
+
+                                Word.Range seqRng = sepRng.Duplicate;
+                                seqRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+
+                                Word.Field seqField = doc.Fields.Add(seqRng, Word.WdFieldType.wdFieldEmpty, @"SEQ 公式 \* ARABIC \s 1", false);
+
+                                Word.Range lastRng = seqField.Result.Duplicate;
+                                lastRng.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                                lastRng.Move(Word.WdUnits.wdCharacter, 1);
+
+                                Word.Range newBmRng = doc.Range(bmStartPos, lastRng.Start);
+                                doc.Bookmarks.Add(bmName, newBmRng);
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    try { doc.Bookmarks.ShowHidden = oldShowHidden; } catch { }
+                }
+            }
+            catch { }
+            finally
+            {
+                try { app.ScreenUpdating = true; } catch { }
+            }
+        }
+
         #region VSTO 生成的代码
 
         /// <summary>
@@ -651,4 +861,5 @@ namespace BoType
         
         #endregion
     }
+
 }
